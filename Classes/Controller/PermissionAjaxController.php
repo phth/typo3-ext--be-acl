@@ -1,6 +1,7 @@
 <?php
 namespace JBartels\BeAcl\Controller;
 
+use JBartels\BeAcl\Exception\RuntimeException;
 /*
  * This file is part of the TYPO3 CMS project.
  *
@@ -150,18 +151,18 @@ class PermissionAjaxController extends \TYPO3\CMS\Beuser\Controller\PermissionAj
         $modifyAccessList = $tcemainObj->checkModifyAccessList($table);
         // Check basic permissions and circumstances:
         if (!isset($GLOBALS['TCA'][$table]) || $tcemainObj->tableReadOnly($table) || !is_array($tcemainObj->cmdmap[$table]) || !$modifyAccessList) {
-            throw new \JBartels\BeAcl\Exception\RuntimeException($GLOBALS['LANG']->getLL('noPermissionToModifyAcl'));
+            throw new RuntimeException($GLOBALS['LANG']->getLL('noPermissionToModifyAcl'));
         }
 
         // Check table / id
         if (!$GLOBALS['TCA'][$table] || !$id) {
-            throw new \JBartels\BeAcl\Exception\RuntimeException(sprintf($GLOBALS['LANG']->getLL('noEditAccessToAclRecord'), $id, $table));
+            throw new RuntimeException(sprintf($GLOBALS['LANG']->getLL('noEditAccessToAclRecord'), $id, $table));
         }
 
         // Check edit access
         $hasEditAccess = $tcemainObj->BE_USER->recordEditAccessInternals($table, $id, false, false, true);
         if (!$hasEditAccess) {
-            throw new \JBartels\BeAcl\Exception\RuntimeException(sprintf($GLOBALS['LANG']->getLL('noEditAccessToAclRecord'), $id, $table));
+            throw new RuntimeException(sprintf($GLOBALS['LANG']->getLL('noEditAccessToAclRecord'), $id, $table));
         }
     }
 

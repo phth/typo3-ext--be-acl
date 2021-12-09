@@ -162,8 +162,8 @@ class UserAuthGroup
         $this->getPagePermsClause_single(0, $that->user['uid'], $perms);
 
         // get allowed IDs for every single group
-        if ($that->groupList) {
-            $groupList = explode(',', $that->groupList);
+        if ($that->userGroupsUID) {
+            $groupList = $that->userGroupsUID;
             foreach ($groupList as $singleGroup) {
                 $this->getPagePermsClause_single(1, $singleGroup, $perms);
             }

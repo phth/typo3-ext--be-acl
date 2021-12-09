@@ -24,6 +24,8 @@ namespace JBartels\BeAcl\Controller;
  *  This copyright notice MUST APPEAR in all copies of the script!
  ***************************************************************/
 
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Backend\Utility\IconUtility;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
@@ -31,6 +33,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Backend\Tree\View\PageTreeView;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
+use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
 use TYPO3\CMS\Extbase\Mvc\View\ViewInterface;
 use JBartels\BeAcl\View\BackendTemplateView;
@@ -85,12 +88,21 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
      * @param ViewInterface $view The view to be initialized
      * @return void
      */
-    protected function initializeView(ViewInterface $view)
+    protected function initializeView(string $template = ''): void
     {
-        parent::initializeView($view);
+        parent::initializeView($template);
+
         // Add custom JS for Acl permissions
-        if ($view instanceof BackendTemplateView) {
-            $view->getModuleTemplate()->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/BeAcl/AclPermissions');
+        if ($template !== '') {
+            $this->view->setTemplateRootPaths(['EXT:beuser/Resources/Private/Templates', 'EXT:be_acl/Resources/Private/Templates']);
+            $this->view->setPartialRootPaths(['EXT:beuser/Resources/Private/Partials', 'EXT:be_acl/Resources/Private/Partials']);
+            $this->view->setLayoutRootPaths(['EXT:beuser/Resources/Private/Layouts', 'EXT:be_acl/Resources/Private/Layouts']);
+            if(file_exists(GeneralUtility::getFileAbsFileName('EXT:be_acl/Resources/Private/Templates/Permission/' . $template . '.html'))) {
+                $this->view->setTemplatePathAndFilename(
+                    GeneralUtility::getFileAbsFileName('EXT:be_acl/Resources/Private/Templates/Permission/' . $template . '.html')
+                );
+            }
+            $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/BeAcl/AclPermissions');
         }
     }
 
@@ -99,9 +111,26 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
      *
      * @return void
      */
-    public function indexAction()
+    public function indexAction(ServerRequestInterface $request): ResponseInterface
     {
-        parent::indexAction();
+        $this->view->assignMultiple([
+            'currentId' => $this->id,
+            'viewTree' => $this->getTree(),
+            'beUsers' => BackendUtility::getUserNames(),
+            'beGroups' => BackendUtility::getGroupNames(),
+            'depth' => $this->depth,
+            'depthOptions' => $this->getDepthOptions(),
+            'depthBaseUrl' => $this->uriBuilder->buildUriFromRoute('system_BeuserTxPermission', [
+                'id' => $this->id,
+                'depth' => '${value}',
+                'action' => 'index',
+            ]),
+            'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('system_BeuserTxPermission', [
+                'id' => $this->id,
+                'depth' => $this->depth,
+                'action' => 'index',
+            ]),
+        ]);
 
         // Get ACL configuration
         $beAclConfig = $this->getExtConf();
@@ -165,6 +194,8 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
          */
         $this->buildACLtree(array_keys($userAcls), array_keys($groupAcls));
         $this->view->assign('aclList', $this->aclList);
+
+        return $this->htmlResponse($this->moduleTemplate->setContent($this->view->render())->renderContent());
     }
 
     /**
@@ -172,9 +203,43 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
      *
      * @return void
      */
-    public function editAction()
+    public function editAction(ServerRequestInterface $request): ResponseInterface
     {
-        parent::editAction();
+        $lang = $this->getLanguageService();
+        $selectNone = $lang->sL('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:selectNone');
+        $selectUnchanged = $lang->sL('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:selectUnchanged');
+
+        // Owner selector
+        $beUserDataArray = [0 => $selectNone];
+        foreach (BackendUtility::getUserNames() as $uid => $row) {
+            $beUserDataArray[$uid] = $row['username'] ?? '';
+        }
+        $beUserDataArray[-1] = $selectUnchanged;
+
+        // Group selector
+        $beGroupDataArray = [0 => $selectNone];
+        foreach (BackendUtility::getGroupNames() as $uid => $row) {
+            $beGroupDataArray[$uid] = $row['title'] ?? '';
+        }
+        $beGroupDataArray[-1] = $selectUnchanged;
+
+        $this->view->assignMultiple([
+            'id' => $this->id,
+            'depth' => $this->depth,
+            'currentBeUser' => $this->pageInfo['perms_userid'] ?? 0,
+            'beUserData' => $beUserDataArray,
+            'currentBeGroup' => $this->pageInfo['perms_groupid'] ?? 0,
+            'beGroupData' => $beGroupDataArray,
+            'pageInfo' => $this->pageInfo,
+            'returnUrl' => $this->returnUrl,
+            'recursiveSelectOptions' => $this->getRecursiveSelectOptions(),
+            'formAction' => (string)$this->uriBuilder->buildUriFromRoute('system_BeuserTxPermission', [
+                'action' => 'update',
+                'id' => $this->id,
+                'depth' => $this->depth,
+                'returnUrl' => $this->returnUrl,
+            ]),
+        ]);
 
         // Get ACL configuration
         $beAclConfig = $this->getExtConf();
@@ -209,6 +274,9 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
         }
         $this->view->assign('userGroupSelectorOptions', $userGroupSelectorOptions);
         $this->view->assign('pageAcls', $pageAcls);
+
+
+        return $this->htmlResponse($this->moduleTemplate->setContent($this->view->render())->renderContent());
     }
 
     /**
@@ -218,15 +286,17 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
      * @param array $mirror
      * @return void
      */
-    protected function updateAction(array $data, array $mirror)
+    protected function updateAction(ServerRequestInterface $request): ResponseInterface
     {
+        $data = (array)($request->getParsedBody()['data'] ?? []);
+        $mirror = (array)($request->getParsedBody()['mirror'] ?? []);
         // Process data map
         $tce = GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\DataHandling\\DataHandler');
         $tce->stripslashes_values = 0;
         $tce->start($data, array());
         $tce->process_datamap();
 
-        parent::updateAction($data, $mirror);
+        parent::updateAction($request);
     }
 
     /*****************************

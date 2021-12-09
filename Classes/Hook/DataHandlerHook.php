@@ -82,7 +82,7 @@ class DataHandlerHook
         $table,
         $recordId,
         $commandValue,
-        \TYPO3\CMS\Core\DataHandling\DataHandler $tceMain
+        DataHandler $tceMain
     ) {
 
         // This is required to take care of deleted ACLs.
@@ -97,7 +97,7 @@ class DataHandlerHook
     protected function flushPermissionCache()
     {
         /** @var \JBartels\BeAcl\Cache\PermissionCache $permissionCache */
-        $permissionCache = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('JBartels\\BeAcl\\Cache\\PermissionCache');
+        $permissionCache = GeneralUtility::makeInstance('JBartels\\BeAcl\\Cache\\PermissionCache');
         $permissionCache->flushCache();
     }
 
