@@ -24,16 +24,18 @@ namespace JBartels\BeAcl\Controller;
  *  This copyright notice MUST APPEAR in all copies of the script!
  ***************************************************************/
 
+use JBartels\BeAcl\Exception\RuntimeException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Backend\Utility\IconUtility;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Backend\Tree\View\PageTreeView;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
-use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
+use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
 use TYPO3\CMS\Extbase\Mvc\View\ViewInterface;
 use JBartels\BeAcl\View\BackendTemplateView;
@@ -50,6 +52,10 @@ use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
  */
 class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionController
 {
+    private const SESSION_PREFIX = 'tx_Beuser_';
+    private const ALLOWED_ACTIONS = ['index', 'edit', 'update'];
+    private const DEPTH_LEVELS = [1, 2, 3, 4, 10];
+    private const RECURSIVE_LEVELS = 10;
 
     protected $defaultViewObjectName = BackendTemplateView::class;
 
@@ -58,6 +64,12 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
     protected $currentAction;
 
     protected $aclTypes = [0, 1];
+
+    /**
+     * ACL table
+     * @var string
+     */
+    protected $table = 'tx_beacl_acl';
 
     /*****************************
      *
@@ -72,6 +84,7 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
      */
     protected function initializeAction()
     {
+
         parent::initializeAction();
 
         if(empty($this->returnUrl)) {
@@ -90,6 +103,7 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
      */
     protected function initializeView(string $template = ''): void
     {
+
         parent::initializeView($template);
 
         // Add custom JS for Acl permissions
@@ -104,6 +118,7 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
             }
             $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/BeAcl/AclPermissions');
         }
+
     }
 
     /**
@@ -124,6 +139,9 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
                 'id' => $this->id,
                 'depth' => '${value}',
                 'action' => 'index',
+            ]),
+            'editUrl' => $this->uriBuilder->buildUriFromRoute('system_BeuserTxPermission', [
+                'action' => 'edit',
             ]),
             'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('system_BeuserTxPermission', [
                 'id' => $this->id,
@@ -205,6 +223,7 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
      */
     public function editAction(ServerRequestInterface $request): ResponseInterface
     {
+
         $lang = $this->getLanguageService();
         $selectNone = $lang->sL('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:selectNone');
         $selectUnchanged = $lang->sL('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:selectUnchanged');
@@ -297,6 +316,9 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
         $tce->process_datamap();
 
         parent::updateAction($request);
+
+        return $this->responseFactory->createResponse(303)
+            ->withHeader('location', $this->returnUrl);
     }
 
     /*****************************
@@ -527,9 +549,88 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
         }
     }
 
+    public function handleAjaxRequest(ServerRequestInterface $request): ResponseInterface
+    {
+        $parsedBody = $request->getParsedBody();
+        $action = $parsedBody['action'] ?? null;
+        $this->initializeView();
+        $response = parent::handleAjaxRequest($request);
+
+        if($action == 'delete_acl') {
+            $response = $this->deleteAcl($request, $response);
+        }
+
+        return $response;
+    }
+
+    protected function deleteAcl(ServerRequestInterface $request, ResponseInterface $response)
+    {
+        $GLOBALS['LANG']->includeLLFile('EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf');
+        $GLOBALS['LANG']->getLL('aclUsers');
+
+        $postData = $request->getParsedBody();
+        $aclUid = !empty($postData['acl']) ? $postData['acl'] : null;
+
+        if (!MathUtility::canBeInterpretedAsInteger($aclUid)) {
+            return $this->errorResponse($response, $GLOBALS['LANG']->getLL('noAclId'), 400);
+        }
+        $aclUid = (int)$aclUid;
+        // Prepare command map
+        $cmdMap = [
+            $this->table => [
+                $aclUid => ['delete' => 1]
+            ]
+        ];
+
+        try {
+            // Process command map
+            $tce = GeneralUtility::makeInstance(DataHandler::class);
+            $tce->stripslashes_values = 0;
+            $tce->start(array(), $cmdMap);
+            $this->checkModifyAccess($this->table, $aclUid, $tce);
+            $tce->process_cmdmap();
+        } catch (\Exception $ex) {
+            return $this->errorResponse($response, $ex->getMessage(), 403);
+        }
+
+        $body = [
+            'title' => $GLOBALS['LANG']->getLL('aclSuccess'),
+            'message' => $GLOBALS['LANG']->getLL('aclDeleted')
+        ];
+        // Return result
+        $response->getBody()->write(json_encode($body));
+        return $response;
+    }
+
+    protected function checkModifyAccess($table, $id, DataHandler $tcemainObj)
+    {
+        // Check modify access
+        $modifyAccessList = $tcemainObj->checkModifyAccessList($table);
+        // Check basic permissions and circumstances:
+        if (!isset($GLOBALS['TCA'][$table]) || $tcemainObj->tableReadOnly($table) || !is_array($tcemainObj->cmdmap[$table]) || !$modifyAccessList) {
+            throw new RuntimeException($GLOBALS['LANG']->getLL('noPermissionToModifyAcl'));
+        }
+
+        // Check table / id
+        if (!$GLOBALS['TCA'][$table] || !$id) {
+            throw new RuntimeException(sprintf($GLOBALS['LANG']->getLL('noEditAccessToAclRecord'), $id, $table));
+        }
+
+        // Check edit access
+        $hasEditAccess = $tcemainObj->BE_USER->recordEditAccessInternals($table, $id, false, false, true);
+        if (!$hasEditAccess) {
+            throw new RuntimeException(sprintf($GLOBALS['LANG']->getLL('noEditAccessToAclRecord'), $id, $table));
+        }
+    }
+
     protected function getExtConf()
     {
         return GeneralUtility::makeInstance(ExtensionConfiguration::class)->get('be_acl');
 	}
+
+    protected function errorResponse(ResponseInterface $response, $reason, $status = 500)
+    {
+        return $response->withStatus($status, $reason);
+    }
 }
 

@@ -127,10 +127,9 @@ define(['jquery','TYPO3/CMS/Beuser/Permissions','TYPO3/CMS/Backend/Notification'
 			type = (typeVal == 1) ? 'group' : 'user';
 	   
 		// get child nodes of user/group selector
-		var $selector = $('select[name=tx_beuser_system_beusertxpermission\\[data\\]\\[pages\\]\\['+pageID+'\\]\\[perms_'+type+'id\\]]');
-
+		var $selector = $('select[name="data[pages]['+pageID+'][perms_'+type+'id]"]');
 		// delete current object selector options
-		var $objSelector = $('select[name=tx_beuser_system_beusertxpermission\\[data\\]\\[tx_beacl_acl\\]\\[' + ACLid + '\\]\\[object_id\\]]');
+		var $objSelector = $('select[name=data\\[tx_beacl_acl\\]\\[' + ACLid + '\\]\\[object_id\\]]');
 		$objSelector.empty();
 
 		// set new options on object selector
@@ -167,7 +166,7 @@ define(['jquery','TYPO3/CMS/Beuser/Permissions','TYPO3/CMS/Backend/Notification'
 			.find('.tx_beacl-edit-acl-row').each(function() {
 				var acluid = $(this).data('acluid');
 				if(acluid) {
-					Permissions.setCheck("check[perms_acl_" + acluid + "]","tx_beuser_system_beusertxpermission[data][tx_beacl_acl][" + acluid + "][permissions]");
+					checkboxGroupCheckbox = $(this).find('[data-checkbox-group]');
 					currentACLs.push(acluid);
 				}
 			});
