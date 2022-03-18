@@ -10,10 +10,18 @@
 </f:section>
 
 <f:section name="content">
-	<div class="form-group">
-		<label for="depth"><f:translate key="LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:Depth" />:</label>
-		<f:form.select class="form-control" id="depth" value="{depth}" options="{depthOptions}" additionalAttributes="{onchange: 'jumpToUrl(\'{depthBaseUrl}\'.replace(\'__DEPTH__\', this.options[this.selectedIndex].value), this);'}" />
-	</div>
+    <div class="row row-cols-auto align-items-end g-3">
+        <div class="col">
+            <div class="form-group">
+                <label for="depth" class="form-label"><f:translate key="LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:Depth" /></label>
+                <select class="form-select" id="depth" name="depth" data-global-event="change" data-action-navigate="$data=~s/$value/" data-navigate-value="{depthBaseUrl}">
+                    <f:for each="{depthOptions}" key="value" as="option">
+                        <option value="{value}" {f:if(condition: '{value} == {depth}', then: 'selected')}>{option}</option>
+                    </f:for>
+                </select>
+            </div>
+        </div>
+    </div>
 	<f:if condition="{enableFilterSelector}==1">
 	<form action="" name="aclfilterform" method="POST">
 		<div class="row">
@@ -75,36 +83,49 @@
 					<tr>
 						<f:if condition="{data.row.uid}">
 							<f:then>
+                                <f:comment>DD -Added from core template</f:comment>
+                                <f:variable name="editUrl">
+                                    <be:moduleLink route="system_BeuserTxPermission" arguments="{id: '{f:if(condition: data.row._ORIG_uid, then: data.row._ORIG_uid, else: data.row.uid)}', action: 'edit', depth: depth, returnUrl: returnUrl}" />
+                                </f:variable>
+
 								<f:comment>
 									A "normal" page row is rendered, not the root page
 								</f:comment>
 
-								<td align="left" nowrap="nowrap">
-									<f:be.link
-										route="system_BeuserTxPermission"
-										parameters="{action: 'edit',id: '{f:if(condition: data.row._ORIG_uid, then: data.row._ORIG_uid, else: data.row.uid)}', depth: depth, returnUrl: '{f:uri.action(action: \'index\', arguments: {id: currentId, depth: depth})}'}"
+								<td align="left" class="nowrap">
+									<f:link.action
+										action="edit"
+										arguments="{id: '{f:if(condition: data.row._ORIG_uid, then: data.row._ORIG_uid, else: data.row.uid)}', depth: depth, returnUrl: '{f:uri.action(action: \'index\', arguments: {id: currentId, depth: depth})}'}"
 										title="{f:translate(key: 'LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:ch_permissions')}"
 									>
 										<f:format.raw>{data.depthData}{data.HTML}</f:format.raw>
 										{data.row.title -> f:format.crop(maxCharacters:20)}
-									</f:be.link>
+									</f:link.action>
 								</td>
 
 								<td>
 									<f:comment>
 										Edit link is workspace aware: If in ws, link to edit the ws overlay record is rendered
 									</f:comment>
-									<f:be.link
-										route="system_BeuserTxPermission"
-										parameters="{action: 'edit',id: '{f:if(condition: data.row._ORIG_uid, then: data.row._ORIG_uid, else: data.row.uid)}', depth: depth, returnUrl: '{f:uri.action(action: \'index\', arguments: {id: currentId, depth: depth})}'}"
+                                    <f:comment>DD -Replaced from core template</f:comment>
+									<!--f:link.action
+										action="edit"
+										arguments="{id: '{f:if(condition: data.row._ORIG_uid, then: data.row._ORIG_uid, else: data.row.uid)}', depth: depth, returnUrl: '{f:uri.action(action: \'index\', arguments: {id: currentId, depth: depth})}'}"
 										class="btn btn-default"
 										title="{f:translate(key: 'LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:ch_permissions')}"
 									>
 										<core:icon identifier="actions-document-open" />
-									</f:be.link>
+									</f:link.action-->
+
+                                    <a href="{editUrl}"
+                                       class="btn btn-default"
+                                       title="{f:translate(key: 'LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:ch_permissions')}">
+                                        <core:icon identifier="actions-open" />
+                                    </a>
+
 								</td>
 								<f:if condition="{disableOldPermissionSystem}==0">
-								<td nowrap="nowrap">
+								<td class="nowrap">
 									<bu:permissions permission="{data.row.perms_user}" scope="user" pageId="{data.row.uid}" />
 									<f:render
 										partial="Permission/Ownername"
@@ -116,7 +137,7 @@
 									/>
 								</td>
 
-								<td nowrap="nowrap">
+								<td class="nowrap">
 									<bu:permissions permission="{data.row.perms_group}" scope="group" pageId="{data.row.uid}" />
 									<f:render
 										partial="Permission/Groupname"
@@ -128,11 +149,11 @@
 									/>
 								</td>
 
-								<td nowrap="nowrap">
+								<td class="nowrap">
 									<bu:permissions permission="{data.row.perms_everybody}" scope="everybody" pageId="{data.row.uid}" />
 								</td>
 								</f:if>
-								<td nowrap="nowrap">
+								<td class="nowrap">
 									<span id="el_{data.row.uid}">
 										<f:if condition="{data.row.editlock}">
 											<f:then>
@@ -161,12 +182,12 @@
 									</span>
 								</td>
 
-								<td nowrap="nowrap"><small><strong><ba:arrayElement array="{aclList}" key="{data.row.uid}" subKey="meta.0.acls" /></strong> <f:translate key='LLL:EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf:acls' /><br />
+								<td class="nowrap"><small><strong><ba:arrayElement array="{aclList}" key="{data.row.uid}" subKey="meta.0.acls" /></strong> <f:translate key='LLL:EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf:acls' /><br />
 									<strong><ba:arrayElement array="{aclList}" key="{data.row.uid}" subKey="meta.0.inherited" /></strong> <f:translate key='LLL:EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf:aclsInherited' /></small>
 								</td>
 								<f:if condition="{userSelectedAcls->f:count()} > 0">
 									<f:for each="{userSelectedAcls}" as="userAcl" key="oid">
-									<td nowrap="nowrap">
+									<td class="nowrap">
 										<ba:permissions permission="{ba:arrayElement(array:aclList, key:data.row.uid, subKey:'0.{oid}.permissions')}" scope="useracl" pageId="{data.row.uid}" />
 										<f:alias map="{appliedAclPid: '{ba:arrayElement(array:aclList, key:data.row.uid, subKey:\'0.{oid}.pid\')}'}">
 											<f:if condition="{appliedAclPid}"><span class="fa fa-info-circle" data-toggle="tooltip" data-placement="top" title="<f:translate key='LLL:EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf:recursiveAclPage' />{appliedAclPid}"></span></f:if>
@@ -176,12 +197,12 @@
 								</f:if>
 
 
-								<td nowrap="nowrap"><small><strong><ba:arrayElement array="{aclList}" key="{data.row.uid}" subKey="meta.1.acls" /></strong> <f:translate key='LLL:EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf:acls' /><br />
+								<td class="nowrap"><small><strong><ba:arrayElement array="{aclList}" key="{data.row.uid}" subKey="meta.1.acls" /></strong> <f:translate key='LLL:EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf:acls' /><br />
 									<strong><ba:arrayElement array="{aclList}" key="{data.row.uid}" subKey="meta.1.inherited" /></strong> <f:translate key='LLL:EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf:aclsInherited' /></small>
 								</td>
 								<f:if condition="{groupSelectedAcls->f:count()} > 0">
 									<f:for each="{groupSelectedAcls}" as="groupAcl" key="oid">
-										<td nowrap="nowrap">
+										<td class="nowrap">
 										<ba:permissions permission="{ba:arrayElement(array:aclList, key:data.row.uid, subKey:'1.{oid}.permissions')}" scope="groupacl" pageId="{data.row.uid}" />
 										<f:alias map="{appliedAclPid: '{ba:arrayElement(array:aclList, key:data.row.uid, subKey:\'1.{oid}.pid\')}'}">
 											<f:if condition="{appliedAclPid}"><span class="fa fa-info-circle" data-toggle="tooltip" data-placement="top" title="<f:translate key='LLL:EXT:be_acl/Resources/Private/Languages/locallang_perm.xlf:recursiveAclPage' />{appliedAclPid}"></span></f:if>
@@ -196,17 +217,17 @@
 								<f:comment>
 									Root page row is rendered
 								</f:comment>
-								<td align="left" nowrap="nowrap">
+								<td align="left" class="nowrap">
 									<f:format.raw>{data.HTML}</f:format.raw>
 									{data.row.title -> f:format.crop(maxCharacters:20)}
 								</td>
 								<td></td>
 								<f:if condition="{disableOldPermissionSystem}==0">
-								<td nowrap="nowrap"></td>
-								<td nowrap="nowrap"></td>
-								<td nowrap="nowrap"></td>
+								<td class="nowrap"></td>
+								<td class="nowrap"></td>
+								<td class="nowrap"></td>
 								</f:if>
-								<td nowrap="nowrap"></td>
+								<td class="nowrap"></td>
 							</f:else>
 						</f:if>
 					</tr>
@@ -215,7 +236,7 @@
 		</div>
 	</div>
 
-	<f:format.raw>{cshItem}</f:format.raw>
+	<!--f:format.raw>{cshItem}</f:format.raw-->
 
 	<h3><f:translate key="LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:Legend" />:</h3>
 	<div class="access-legend">
