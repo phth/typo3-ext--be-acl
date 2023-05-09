@@ -373,7 +373,7 @@ class PermissionController extends \TYPO3\CMS\Beuser\Controller\PermissionContro
 
             $currentSelectionOverride_raw = GeneralUtility::_GP('tx_beacl_objsel');
             $currentSelectionOverride = array();
-            if (is_array($currentSelectionOverride_raw[$type])) {
+            if ( is_array($currentSelectionOverride_raw) && array_key_exists($type, $currentSelectionOverride_raw) && is_array($currentSelectionOverride_raw[$type])) {
                 foreach ($currentSelectionOverride_raw[$type] as $tmp) {
                     $currentSelectionOverride[$tmp] = $tmp;
                 }
