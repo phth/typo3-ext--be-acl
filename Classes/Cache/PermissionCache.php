@@ -1,6 +1,7 @@
 <?php
 namespace JBartels\BeAcl\Cache;
 
+use TYPO3\CMS\Core\Authentication\GroupResolver;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use JBartels\BeAcl\Exception\RuntimeException;
 /***************************************************************
@@ -66,6 +67,11 @@ class PermissionCache implements SingletonInterface
      * @var \JBartels\BeAcl\Cache\TimestampUtility
      */
     protected $timestampUtility;
+
+    /**
+     * @var \TYPO3\CMS\Core\Authentication\GroupResolver
+     */
+    protected $groupResolver;
 
     /**
      * Initializes the timestamp utility.
@@ -184,6 +190,14 @@ class PermissionCache implements SingletonInterface
     }
 
     /**
+     * @param GroupResolver $groupResolver
+     */
+    public function setGroupResolver($groupResolver)
+    {
+        $this->groupResolver = $groupResolver;
+    }
+
+    /**
      * Retrieves the cache data from the cache.
      *
      * @return PermissionCacheData|null
@@ -214,7 +228,9 @@ class PermissionCache implements SingletonInterface
             throw new RuntimeException('The Backend user needs to be initializes before the cache identifier can be generated.');
         }
 
-        $identifier = $this->backendUser->user['uid'] . ';' . $this->backendUser->user['usergroup_cached_list'] . ';' . $this->backendUser->user['workspace_id'];
+        $groups = $this->groupResolver->resolveGroupsForUser($this->backendUser->user, 'be_groups');
+        $groupUids = array_map(fn(array $group) => $group['uid'], $groups);
+        $identifier = $this->backendUser->user['uid'] . ';' . implode(',', $groupUids) . ';' . $this->backendUser->user['workspace_id'];
 
         $requestedPermissions = trim($requestedPermissions);
         if ($requestedPermissions !== '') {
@@ -235,6 +251,9 @@ class PermissionCache implements SingletonInterface
         /** @var TimestampUtility $timestampUtility */
         $timestampUtility = GeneralUtility::makeInstance('JBartels\\BeAcl\\Cache\\TimestampUtility');
         $this->setTimestampUtility($timestampUtility);
+        /** @var GroupResolver $groupResolver */
+        $groupResolver = GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\Authentication\\GroupResolver');
+        $this->setGroupResolver($groupResolver);
     }
 
     /**
